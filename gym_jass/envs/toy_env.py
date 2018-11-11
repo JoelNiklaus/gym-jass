@@ -2,7 +2,7 @@ import gym
 from gym import spaces
 
 
-class SchieberEnv(gym.Env):
+class ToyEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     reward_range = (-1, 1)  # -1 on losing round, 1 on winning round
 
