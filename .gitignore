@@ -1,1 +1,6 @@
 .idea
+build
+dist
+gym_jass/envs/__pycache__
+gym_jass/__pycache__
+gym_jass.egg-info
