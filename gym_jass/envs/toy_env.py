@@ -49,6 +49,7 @@ class ToyEnv(gym.Env):
 
     def reset(self):
         self.cards_to_play = 9
+        return self.cards_to_play
 
     def render(self, mode='human', close=False):
         print(self.cards_to_play)
