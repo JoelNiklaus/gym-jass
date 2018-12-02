@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 import time
 
 import jsonpickle
@@ -65,17 +66,51 @@ class SchieberEnv(gym.Env):
         self.action = {}
         self.observation = {}
 
-        self.start_game_server()
+        self.task = self.start_jass_server()
+        print("init finished")
 
     def __del__(self):
         logger.info("Environment has been stopped.")
 
-    def start_game_server(self):
+    def start_jass_server(self):
+        self.player = ExternalPlayer(name='GYM-RL')
         players = [RandomPlayer(name='Tick', seed=1), RandomPlayer(name='Trick', seed=2),
-                   RandomPlayer(name='Track', seed=3), ExternalPlayer(name='GYM-RL')]
-        tournament = Tournament(point_limit=1500, seed=0)
-        [tournament.register_player(player) for player in players]
-        TournamentServer(tournament)
+                   RandomPlayer(name='Track', seed=3), self.player]
+        self.tournament = Tournament(point_limit=1500, seed=0)
+        [self.tournament.register_player(player) for player in players]
+
+        thread = threading.Thread(target=self.tournament.play)
+        thread.start()
+
+        # action = Card(Suit.ROSE, 9)
+        #
+        # obs = self.player.get_observation(False)
+        # print(self.tournament.teams[0].points, self.tournament.teams[1].points)
+        # print(self.tournament.games[-1].cards_on_table)
+        # print(self.tournament.games[-1].stiche)
+        # print(obs)
+        # self.player.set_action(action)
+        #
+        #
+        # obs = self.player.get_observation()
+        # print(self.tournament.teams[0].points, self.tournament.teams[1].points)
+        # print(self.tournament.games[-1].cards_on_table)
+        # print(self.tournament.games[-1].stiche)
+        # print(obs)
+        # self.player.set_action(action)
+        #
+        # obs = self.player.get_observation()
+        # print(self.tournament.teams[0].points, self.tournament.teams[1].points)
+        # print(self.tournament.games[-1].cards_on_table)
+        # print(self.tournament.games[-1].stiche)
+        # print(obs)
+        # self.player.set_action(action)
+        #
+        # time.sleep(100)
+
+        # server = TournamentServer(tournament)
+        # stop = asyncio.Future()
+        # return asyncio.get_event_loop().create_task(server.start(stop))
 
         # team_1 = Team(players=[players[0], players[2]])
         # team_2 = Team(players=[players[1], players[3]])
@@ -122,8 +157,6 @@ class SchieberEnv(gym.Env):
         reward = self._get_reward()
         observation = self.observation_dict_to_index(self.observation)
         episode_over = self.observation['teams'][0]['points'] + self.observation['teams'][1]['points'] == 157
-        if episode_over:
-            self.reset()
         return observation, reward, episode_over, {}
 
     def reset(self):
@@ -132,13 +165,24 @@ class SchieberEnv(gym.Env):
                 Returns: observation (object): the initial observation of the
                     space.
         """
-        asyncio.get_event_loop().run_until_complete(self._send_reset_message())
         logger.info("resetting the environment")
 
+        self.tournament.teams[0].points = 0
+        self.tournament.teams[1].points = 0
+        self.observation = {}
+
+        # asyncio.get_event_loop().run_until_complete(self._send_reset_message())
+        # if self.observation == {}:
+        #    observation = asyncio.get_event_loop().run_until_complete(self.get_initial_observation())
+        # else:
+        #    observation = self.observation
+
+        wait = True
         if self.observation == {}:
-            observation = asyncio.get_event_loop().run_until_complete(self.get_initial_observation())
-        else:
-            observation = self.observation
+            wait = False
+        observation = self.player.get_observation(wait)
+        self.observation = observation
+
         return self.observation_dict_to_index(observation)
 
     def render(self, mode='human', close=False):
@@ -216,12 +260,18 @@ class SchieberEnv(gym.Env):
 
 
     def _take_action(self, action):
+        action += 1  # action is sampled between 0 and 35 but must be between 1 and 36!
         self.action = action
-        asyncio.get_event_loop().run_until_complete(self.send_action())
+        action = from_index_to_card(action)
+        self.player.set_action(action)
+        self.observation = self.player.get_observation()
+        print("g")
+        # asyncio.get_event_loop().run_until_complete(self.send_action())
 
     def _get_reward(self):
         # reward = asyncio.get_event_loop().run_until_complete(self._send_reward_message())
         reward = self.observation['teams'][0]['points'] - self.observation['teams'][1]['points']
+        reward = self.tournament.teams[0].points - self.tournament.teams[1].points
         return reward
 
     async def _send_reset_message(self):

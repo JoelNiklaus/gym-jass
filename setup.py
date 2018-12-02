@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='gym_jass',
-    version='0.0.12',
+    version='0.0.13',
     install_requires=['gym>=0.10.8', 'schieber>=0.0.1'],
     author="Joel Niklaus",
     author_email="me@joelniklaus.ch",
