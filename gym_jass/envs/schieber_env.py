@@ -116,6 +116,8 @@ class SchieberEnv(gym.Env):
                  However, official evaluations of your agent are not allowed to
                  use this for learning.
         """
+        logger.info("stepping in the environment")
+
         self._take_action(action)
         reward = self._get_reward()
         observation = self.observation_dict_to_index(self.observation)
@@ -131,6 +133,8 @@ class SchieberEnv(gym.Env):
                     space.
         """
         asyncio.get_event_loop().run_until_complete(self._send_reset_message())
+        logger.info("resetting the environment")
+
         if self.observation == {}:
             observation = asyncio.get_event_loop().run_until_complete(self.get_initial_observation())
         else:
@@ -175,6 +179,8 @@ class SchieberEnv(gym.Env):
                         else:
                             super(MyEnv, self).render(mode=mode) # just raise an exception
                 """
+        logger.info("rendering the environment")
+
         print(self.observation)
 
     def seed(self, seed=None):
@@ -192,6 +198,8 @@ class SchieberEnv(gym.Env):
               'seed'. Often, the main seed equals the provided 'seed', but
               this won't be true if seed=None, for example.
         """
+        logger.info("seeding the environment")
+
         # Seeding makes everything more predictable and reproducible.
         # But this could also be a problem because the players might be more exploitable.
 
@@ -202,6 +210,10 @@ class SchieberEnv(gym.Env):
         #    self.game.players[3].seed = seed + 3
         # return
         pass
+
+    def close(self):
+        logger.info("closing the environment")
+
 
     def _take_action(self, action):
         self.action = action
