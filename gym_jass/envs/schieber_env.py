@@ -149,9 +149,9 @@ class SchieberEnv(gym.Env):
         logger.info("stepping in the environment")
 
         self._take_action(action)
-        reward = self._get_reward()
         observation = self.observation_dict_to_index(self.observation)
         episode_over = self.observation['teams'][0]['points'] + self.observation['teams'][1]['points'] == 157
+        reward = self._get_reward(episode_over)
         return observation, reward, episode_over, {}
 
     def reset(self):
@@ -255,9 +255,11 @@ class SchieberEnv(gym.Env):
         self.player.set_action(action)
         self.observation = self.player.get_observation()
 
-    def _get_reward(self):
-        reward = self.observation['teams'][0]['points'] - self.observation['teams'][1]['points']
-        reward = self.tournament.teams[0].points - self.tournament.teams[1].points
+    def _get_reward(self, episode_over):
+        reward = 0
+        if episode_over:
+            reward = self.observation['teams'][0]['points'] - self.observation['teams'][1]['points']
+            reward = self.tournament.teams[0].points - self.tournament.teams[1].points
         return reward
 
     def observation_dict_to_tuple(self, observation):
