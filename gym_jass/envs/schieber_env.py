@@ -255,8 +255,10 @@ class SchieberEnv(gym.Env):
 
         # leave stack for simplicity for now
         stack = [0] * (8 * 4)
-        # for i in range(len(observation["stiche"])):
-        #    hand[i] = from_card_to_index(observation["cards"][i])
+        for i in range(len(observation["stiche"])):
+            stich = observation["stiche"][i]["played_cards"]
+            for j in range(len(stich)):
+                stack[4 * i + j] = from_string_to_index(stich[j]['card'])
 
         table = [0] * 3
         for i in range(len(observation["table"])):
