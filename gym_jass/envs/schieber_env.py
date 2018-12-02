@@ -59,15 +59,10 @@ class SchieberEnv(gym.Env):
     observation_space = spaces.Box(low=0, high=36, shape=(44,), dtype=int)
 
     def __init__(self):
-        self.servername = 'localhost'
-        self.player_port = 8765
-        self.game_server_port = 9000
-
         self.action = {}
         self.observation = {}
 
-        self.task = self.start_jass_server()
-        print("init finished")
+        self.start_jass_server()
 
     def __del__(self):
         logger.info("Environment has been stopped.")
@@ -171,12 +166,6 @@ class SchieberEnv(gym.Env):
         self.tournament.teams[1].points = 0
         self.observation = {}
 
-        # asyncio.get_event_loop().run_until_complete(self._send_reset_message())
-        # if self.observation == {}:
-        #    observation = asyncio.get_event_loop().run_until_complete(self.get_initial_observation())
-        # else:
-        #    observation = self.observation
-
         wait = True
         if self.observation == {}:
             wait = False
@@ -261,48 +250,15 @@ class SchieberEnv(gym.Env):
 
     def _take_action(self, action):
         action += 1  # action is sampled between 0 and 35 but must be between 1 and 36!
-        self.action = action
         action = from_index_to_card(action)
+        self.action = action
         self.player.set_action(action)
         self.observation = self.player.get_observation()
-        print("g")
-        # asyncio.get_event_loop().run_until_complete(self.send_action())
 
     def _get_reward(self):
-        # reward = asyncio.get_event_loop().run_until_complete(self._send_reward_message())
         reward = self.observation['teams'][0]['points'] - self.observation['teams'][1]['points']
         reward = self.tournament.teams[0].points - self.tournament.teams[1].points
         return reward
-
-    async def _send_reset_message(self):
-        async with websockets.connect(f'ws://localhost:{self.game_server_port}') as websocket:
-            await websocket.send("reset")
-
-    async def _send_reward_message(self):
-        async with websockets.connect(f'ws://localhost:{self.game_server_port}') as websocket:
-            await websocket.send("reward")
-            return await websocket.recv()
-
-    async def send_action(self):
-        async with websockets.connect(f'ws://localhost:{self.player_port}') as websocket:
-            # convert action from rl format to jass server format
-            self.action = from_index_to_card(self.action)
-
-            await websocket.send(jsonpickle.encode(self.action))
-            logger.debug(f"sent action {self.action}")
-
-            message = await websocket.recv()
-            self.observation = jsonpickle.decode(message)
-            logger.debug(f"received observation: {self.observation}")
-            return self.observation
-
-    async def get_initial_observation(self):
-        async with websockets.connect(f'ws://localhost:{self.player_port}') as websocket:
-            logger.debug("waiting for server to send")
-            message = await websocket.recv()
-            self.observation = jsonpickle.decode(message)
-            logger.debug(f"received initial observation: {self.observation}")
-            return self.observation
 
     def observation_dict_to_tuple(self, observation):
         hand = [(4, 9)] * 9
