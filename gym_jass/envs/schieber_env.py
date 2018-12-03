@@ -1,26 +1,13 @@
-import asyncio
 import logging
 import threading
-import time
-
-import jsonpickle
-import websockets
 
 import gym
 from gym import spaces
-from schieber.card import Card, from_tuple_to_card, from_card_to_tuple, from_card_to_index, from_index_to_card, \
-    from_string_to_index
+from schieber.card import from_card_to_tuple, from_card_to_index, from_index_to_card, from_string_to_index
 
-from schieber.game import Game
 from schieber.player.random_player import RandomPlayer
-from schieber.player.greedy_player.greedy_player import GreedyPlayer
 from schieber.player.external_player import ExternalPlayer
-from schieber.suit import Suit
-from schieber.team import Team
 from schieber.tournament import Tournament
-
-from gym_jass.envs.game_server import GameServer
-from gym_jass.envs.tournament_server import TournamentServer
 
 logger = logging.getLogger(__name__)
 
@@ -62,56 +49,54 @@ class SchieberEnv(gym.Env):
         self.action = {}
         self.observation = {}
 
-        self.start_jass_server()
-
-    def __del__(self):
-        logger.info("Environment has been stopped.")
-
-    def start_jass_server(self):
         self.player = ExternalPlayer(name='GYM-RL')
         players = [RandomPlayer(name='Tick', seed=1), RandomPlayer(name='Trick', seed=2),
                    RandomPlayer(name='Track', seed=3), self.player]
         self.tournament = Tournament(point_limit=1500, seed=0)
         [self.tournament.register_player(player) for player in players]
 
+        self.start_jass_server()
+
+    def __del__(self):
+        logger.info("Environment has been stopped.")
+
+    def start_jass_server(self):
         thread = threading.Thread(target=self.tournament.play)
         thread.start()
 
+        # team_1 = Team(players=[players[0], players[2]])
+        # team_2 = Team(players=[players[1], players[3]])
+        # self.teams = [team_1, team_2]
+        # self.game = Game(self.teams, point_limit=1000, use_counting_factor=False, seed=1)
+        #
+        # thread = threading.Thread(target=self.game.play)
+        # thread.start()
+        #
         # action = Card(Suit.ROSE, 9)
         #
         # obs = self.player.get_observation(False)
-        # print(self.tournament.teams[0].points, self.tournament.teams[1].points)
-        # print(self.tournament.games[-1].cards_on_table)
-        # print(self.tournament.games[-1].stiche)
+        # print(self.teams[0].points, self.teams[1].points)
+        # print(self.game.cards_on_table)
+        # print(self.game.stiche)
         # print(obs)
         # self.player.set_action(action)
         #
         #
         # obs = self.player.get_observation()
-        # print(self.tournament.teams[0].points, self.tournament.teams[1].points)
-        # print(self.tournament.games[-1].cards_on_table)
-        # print(self.tournament.games[-1].stiche)
+        # print(self.teams[0].points, self.teams[1].points)
+        # print(self.game.cards_on_table)
+        # print(self.game.stiche)
         # print(obs)
         # self.player.set_action(action)
         #
         # obs = self.player.get_observation()
-        # print(self.tournament.teams[0].points, self.tournament.teams[1].points)
-        # print(self.tournament.games[-1].cards_on_table)
-        # print(self.tournament.games[-1].stiche)
+        # print(self.teams[0].points, self.teams[1].points)
+        # print(self.game.cards_on_table)
+        # print(self.game.stiche)
         # print(obs)
         # self.player.set_action(action)
         #
         # time.sleep(100)
-
-        # server = TournamentServer(tournament)
-        # stop = asyncio.Future()
-        # return asyncio.get_event_loop().create_task(server.start(stop))
-
-        # team_1 = Team(players=[players[0], players[2]])
-        # team_2 = Team(players=[players[1], players[3]])
-        # teams = [team_1, team_2]
-        # game = Game(teams, point_limit=1000, use_counting_factor=False, seed=1)
-        # GameServer(game)
 
     def step(self, action):
         """Run one timestep of the environment's dynamics. When end of
@@ -164,6 +149,9 @@ class SchieberEnv(gym.Env):
 
         self.tournament.teams[0].points = 0
         self.tournament.teams[1].points = 0
+        # self.teams[0].points = 0
+        # self.teams[1].points = 0
+        # self.game.play()
         self.observation = {}
 
         wait = True
@@ -246,7 +234,6 @@ class SchieberEnv(gym.Env):
 
     def close(self):
         logger.info("closing the environment")
-
 
     def _take_action(self, action):
         action += 1  # action is sampled between 0 and 35 but must be between 1 and 36!
