@@ -243,19 +243,32 @@ class SchieberEnv(gym.Env):
         self.observation = self.player.get_observation()
 
     def _get_reward(self, episode_over):
-        reward = 0
-        if episode_over:
-            reward = self.observation['teams'][0]['points'] - self.observation['teams'][1]['points']
-            reward = self.tournament.teams[0].points - self.tournament.teams[1].points
-        return reward
+        return self._rules_reward()
+        # return self._stich_reward(episode_over)
 
-    def observation_dict_to_tuple(self, observation):
+    def _stich_reward(self, episode_over):
+        if episode_over:
+            # reward = self.observation['teams'][0]['points'] - self.observation['teams'][1]['points']
+            return self.tournament.teams[0].points - self.tournament.teams[1].points
+        else:
+            return 0
+
+    def _rules_reward(self):
+        allowed_cards = self.player.allowed_cards(self.observation)
+        if self.action not in allowed_cards:
+            return -1
+        else:
+            return 1
+
+    @staticmethod
+    def observation_dict_to_tuple(observation):
         hand = [(4, 9)] * 9
         for i in range(len(observation["cards"])):
             hand[i] = from_card_to_tuple(observation["cards"][i])
         return tuple(hand)
 
-    def observation_dict_to_index(self, observation):
+    @staticmethod
+    def observation_dict_to_index(observation):
         hand = [0] * 9
         for i in range(len(observation["cards"])):
             hand[i] = from_card_to_index(observation["cards"][i])
