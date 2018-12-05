@@ -248,8 +248,9 @@ class SchieberEnv(gym.Env):
     @staticmethod
     def observation_dict_to_index(observation):
         hand = [0] * 9
-        for i in range(len(observation["cards"])):
-            hand[i] = from_card_to_index(observation["cards"][i])
+        if "cards" in observation.keys():  # in the initial observation this may still be empty
+            for i in range(len(observation["cards"])):
+                hand[i] = from_card_to_index(observation["cards"][i])
 
         # leave stack for simplicity for now
         stack = [0] * (9 * 4)
