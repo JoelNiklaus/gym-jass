@@ -41,9 +41,9 @@ class SchieberEnv(gym.Env):
     action_space = spaces.Discrete(36)
 
     # index 0 to 8: the player's hand
-    # index 9 to 40: the cards in the stack which have been turned over in the order of appearance
-    # index 41 to 43: the cards currently on the table: 41 --> 1st card, 42 --> 2nd card, 43 --> 3rd card
-    observation_space = spaces.Box(low=0, high=36, shape=(44,), dtype=int)
+    # index 9 to 44: the cards in the stack which have been turned over in the order of appearance
+    # index 45 to 47: the cards currently on the table: 45 --> 1st card, 46 --> 2nd card, 47 --> 3rd card
+    observation_space = spaces.Box(low=0, high=36, shape=(48,), dtype=int)
 
     def __init__(self):
         self.action = {}
@@ -295,7 +295,7 @@ class SchieberEnv(gym.Env):
             hand[i] = from_card_to_index(observation["cards"][i])
 
         # leave stack for simplicity for now
-        stack = [0] * (8 * 4)
+        stack = [0] * (9 * 4)
         for i in range(len(observation["stiche"])):
             stich = observation["stiche"][i]["played_cards"]
             for j in range(len(stich)):
