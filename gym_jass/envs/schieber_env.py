@@ -138,8 +138,8 @@ class SchieberEnv(gym.Env):
 
         self._take_action(action)
         observation = self.observation_dict_to_index(self.observation)
-        episode_over = self.observation['teams'][0]['points'] + self.observation['teams'][1]['points'] == 157
-        reward = self._get_reward(episode_over, rules_reward=True)
+        episode_over = not self.observation['cards']  # this is true when the list is empty
+        reward = self._get_reward(episode_over, rules_reward=False)
         return observation, reward, episode_over, {}
 
     def reset(self):
@@ -152,6 +152,7 @@ class SchieberEnv(gym.Env):
 
         # self.tournament.teams[0].points = 0
         # self.tournament.teams[1].points = 0
+
         self.observation = {}
 
         self._control_endless_play()  # if this is not called here, the endless play blocks the execution
@@ -288,7 +289,8 @@ class SchieberEnv(gym.Env):
         """
         if episode_over:
             # reward = self.observation['teams'][0]['points'] - self.observation['teams'][1]['points']
-            return self.tournament.teams[0].points - self.tournament.teams[1].points
+            # return self.tournament.teams[0].points - self.tournament.teams[1].points
+            return self.game.teams[0].points - self.game.teams[1].points
         else:
             return 0
 
