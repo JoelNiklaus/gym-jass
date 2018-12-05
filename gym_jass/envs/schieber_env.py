@@ -4,9 +4,11 @@ import threading
 import gym
 from gym import spaces
 from schieber.card import from_card_to_tuple, from_card_to_index, from_index_to_card, from_string_to_index
+from schieber.game import Game
 
 from schieber.player.random_player import RandomPlayer
 from schieber.player.external_player import ExternalPlayer
+from schieber.team import Team
 from schieber.tournament import Tournament
 
 logger = logging.getLogger(__name__)
@@ -50,10 +52,15 @@ class SchieberEnv(gym.Env):
         self.observation = {}
 
         self.player = ExternalPlayer(name='GYM-RL')
-        players = [RandomPlayer(name='Tick', seed=1), RandomPlayer(name='Trick', seed=2),
-                   RandomPlayer(name='Track', seed=3), self.player]
-        self.tournament = Tournament(point_limit=1500, seed=0)
-        [self.tournament.register_player(player) for player in players]
+        players = [RandomPlayer(name='Random Opponent 1', seed=1), RandomPlayer(name='Random Partner', seed=2),
+                   RandomPlayer(name='Random Opponent 2', seed=3), self.player]
+        # self.tournament = Tournament(point_limit=1500, seed=0)
+        # [self.tournament.register_player(player) for player in players]
+
+        team_1 = Team(players=[players[0], players[2]])
+        team_2 = Team(players=[players[1], players[3]])
+        self.teams = [team_1, team_2]
+        self.game = Game(self.teams, point_limit=1000, use_counting_factor=False, seed=1)
 
         self.start_jass_server()
 
@@ -61,16 +68,12 @@ class SchieberEnv(gym.Env):
         logger.info("Environment has been stopped.")
 
     def start_jass_server(self):
-        thread = threading.Thread(target=self.tournament.play)
+        # thread = threading.Thread(target=self.tournament.play)
+        # thread.start()
+
+        thread = threading.Thread(target=self.game.play_endless)
         thread.start()
 
-        # team_1 = Team(players=[players[0], players[2]])
-        # team_2 = Team(players=[players[1], players[3]])
-        # self.teams = [team_1, team_2]
-        # self.game = Game(self.teams, point_limit=1000, use_counting_factor=False, seed=1)
-        #
-        # thread = threading.Thread(target=self.game.play)
-        # thread.start()
         #
         # action = Card(Suit.ROSE, 9)
         #
@@ -147,12 +150,11 @@ class SchieberEnv(gym.Env):
         """
         logger.info("resetting the environment")
 
-        self.tournament.teams[0].points = 0
-        self.tournament.teams[1].points = 0
-        # self.teams[0].points = 0
-        # self.teams[1].points = 0
-        # self.game.play()
+        # self.tournament.teams[0].points = 0
+        # self.tournament.teams[1].points = 0
         self.observation = {}
+
+        self._control_endless_play()  # if this is not called here, the endless play blocks the execution
 
         wait = True
         if self.observation == {}:
@@ -161,6 +163,12 @@ class SchieberEnv(gym.Env):
         self.observation = observation
 
         return self.observation_dict_to_index(observation)
+
+    def _control_endless_play(self, stop=False):
+        self.game.endless_play_control.acquire()
+        self.game.stop_playing = stop
+        self.game.endless_play_control.notify_all()
+        self.game.endless_play_control.release()
 
     def render(self, mode='human', close=False):
         """Renders the environment.
@@ -233,7 +241,23 @@ class SchieberEnv(gym.Env):
         pass
 
     def close(self):
+        """
+        Closes the environment and cleans up resources
+        :return:
+        """
         logger.info("closing the environment")
+
+        self._control_endless_play(stop=True)
+
+        # self._join_threads()
+
+    def _join_threads(self):
+        main_thread = threading.current_thread()
+        for t in threading.enumerate():
+            if t is main_thread:
+                continue
+            logging.debug('joining %s', t.getName())
+            t.join()
 
     def _take_action(self, action):
         action += 1  # action is sampled between 0 and 35 but must be between 1 and 36!
