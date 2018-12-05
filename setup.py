@@ -2,8 +2,8 @@ import setuptools
 
 setuptools.setup(
     name='gym_jass',
-    version='0.1.1',
-    install_requires=['gym>=0.10.8', 'schieber>=0.1.0'],
+    version='0.1.5',
+    install_requires=['gym>=0.10.8', 'schieber>=0.1.6'],
     author="Joel Niklaus",
     author_email="me@joelniklaus.ch",
     description="A gym environment for the schieber variant of the Swiss card game Jassen",
