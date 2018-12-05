@@ -136,7 +136,7 @@ class SchieberEnv(gym.Env):
         self._take_action(action)
         observation = self.observation_dict_to_index(self.observation)
         episode_over = self.observation['teams'][0]['points'] + self.observation['teams'][1]['points'] == 157
-        reward = self._get_reward(episode_over)
+        reward = self._get_reward(episode_over, rules_reward=True)
         return observation, reward, episode_over, {}
 
     def reset(self):
@@ -242,11 +242,26 @@ class SchieberEnv(gym.Env):
         self.player.set_action(action)
         self.observation = self.player.get_observation()
 
-    def _get_reward(self, episode_over):
-        return self._rules_reward()
-        # return self._stich_reward(episode_over)
+    def _get_reward(self, episode_over, rules_reward=False):
+        """
+        Calculates the reward of the current timestep
+        :param episode_over:
+        :param rules_reward:
+        :return:
+        """
+        if rules_reward:
+            return self._rules_reward()
+        else:
+            return self._stich_reward(episode_over)
 
     def _stich_reward(self, episode_over):
+        """
+        Gives as reward the point difference of the two teams at the end of the episode.
+        We hope that this reward enables learning useful tactics.
+        :param episode_over:
+        :return:    0 when the episode (game) is still running
+                    the point difference of the game between the team of the RL player and the opponent team
+        """
         if episode_over:
             # reward = self.observation['teams'][0]['points'] - self.observation['teams'][1]['points']
             return self.tournament.teams[0].points - self.tournament.teams[1].points
@@ -254,6 +269,12 @@ class SchieberEnv(gym.Env):
             return 0
 
     def _rules_reward(self):
+        """
+        Gives as reward 1 when the action the RL player chose is allowed and -1 otherwise.
+        We hope that with this reward we can make the RL player learn the rules of the game.
+        :return:    1 when the action is allowed
+                    -1 otherwise
+        """
         allowed_cards = self.player.allowed_cards(self.observation)
         if self.action not in allowed_cards:
             return -1
