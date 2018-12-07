@@ -27,8 +27,12 @@ class SchieberEnv(gym.Env):
     observation_space = spaces.Box(low=0, high=36, shape=(48,), dtype=int)
 
     def __init__(self):
-        self.action = {}
+        self.action = None
         self.observation = {}
+
+        self.reward = 0
+        self.episode_over = False
+        self.valid_card_played = None
 
         self.player = ExternalPlayer(name='GYM-RL')
         players = [RandomPlayer(name='Random Opponent 1', seed=1), RandomPlayer(name='Random Partner', seed=2),
@@ -81,10 +85,9 @@ class SchieberEnv(gym.Env):
         logger.info("stepping in the environment")
 
         self._take_action(action)
-        observation = self.observation_dict_to_index(self.observation)
-        episode_over = not self.observation['cards']  # this is true when the list is empty
-        reward = self._get_reward(episode_over, rules_reward=False)
-        return observation, reward, episode_over, {}
+        self.episode_over = not self.observation['cards']  # this is true when the list is empty
+        self.reward = self._get_reward(rules_reward=True)
+        return self.observation_dict_to_index(self.observation), self.reward, self.episode_over, {}
 
     def reset(self):
         """Resets the state of the environment and returns an initial observation.
@@ -152,7 +155,14 @@ class SchieberEnv(gym.Env):
                 """
         logger.info("rendering the environment")
 
-        print(self.observation)
+        stiche = self.observation['stiche']
+        stich = "No Stich available"
+        if stiche:
+            stich = stiche[-1]
+        output = f"Reward: {self.reward}, " \
+            f"Chosen Card: {self.action} --> Card Allowed: {self.valid_card_played}, " \
+            f"Played Stich: {stich}"
+        print(output)
 
     def seed(self, seed=None):
         """Sets the seed for this env's random number generator(s).
@@ -192,33 +202,30 @@ class SchieberEnv(gym.Env):
         self._control_endless_play(stop=True)
 
     def _take_action(self, action):
-        action += 1  # action is sampled between 0 and 35 but must be between 1 and 36!
-        action = from_index_to_card(action)
-        self.action = action
-        self.player.set_action(action)
+        self.action = from_index_to_card(action + 1)  # action is sampled between 0 and 35 but must be between 1 and 36!
+        self.valid_card_played = self._is_card_allowed()
+        self.player.set_action(self.action)
         self.observation = self.player.get_observation()
 
-    def _get_reward(self, episode_over, rules_reward=False):
+    def _get_reward(self, rules_reward=False):
         """
         Calculates the reward of the current timestep
-        :param episode_over:
         :param rules_reward:
         :return:
         """
         if rules_reward:
             return self._rules_reward()
         else:
-            return self._stich_reward(episode_over)
+            return self._stich_reward()
 
-    def _stich_reward(self, episode_over):
+    def _stich_reward(self):
         """
         Gives as reward the point difference of the two teams at the end of the episode.
         We hope that this reward enables learning useful tactics.
-        :param episode_over:
         :return:    0 when the episode (game) is still running
                     the point difference of the game between the team of the RL player and the opponent team
         """
-        if episode_over:
+        if self.episode_over:
             # reward = self.observation['teams'][0]['points'] - self.observation['teams'][1]['points']
             # return self.tournament.teams[0].points - self.tournament.teams[1].points
             return self.game.teams[0].points - self.game.teams[1].points
@@ -232,11 +239,13 @@ class SchieberEnv(gym.Env):
         :return:    1 when the action is allowed
                     -1 otherwise
         """
-        allowed_cards = self.player.allowed_cards(self.observation)
-        if self.action not in allowed_cards:
-            return -1
-        else:
+        if self._is_card_allowed():
             return 1
+        else:
+            return -1
+
+    def _is_card_allowed(self):
+        return self.action in self.player.allowed_cards(self.observation)
 
     @staticmethod
     def observation_dict_to_tuple(observation):
