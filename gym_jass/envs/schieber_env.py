@@ -5,6 +5,7 @@ import gym
 from gym import spaces
 from schieber.card import from_card_to_tuple, from_card_to_index, from_index_to_card, from_string_to_index
 from schieber.game import Game
+from schieber.player.greedy_player.greedy_player import GreedyPlayer
 
 from schieber.player.random_player import RandomPlayer
 from schieber.player.external_player import ExternalPlayer
@@ -35,8 +36,8 @@ class SchieberEnv(gym.Env):
         self.valid_card_played = None
 
         self.player = ExternalPlayer(name='GYM-RL')
-        players = [RandomPlayer(name='Random Opponent 1', seed=1), RandomPlayer(name='Random Partner', seed=2),
-                   RandomPlayer(name='Random Opponent 2', seed=3), self.player]
+        players = [GreedyPlayer(name='Greedy Opponent 1', seed=1), GreedyPlayer(name='Greedy Partner', seed=2),
+                   GreedyPlayer(name='Greedy Opponent 2', seed=3), self.player]
         team_1 = Team(players=[players[0], players[2]])
         team_2 = Team(players=[players[1], players[3]])
         teams = [team_1, team_2]
