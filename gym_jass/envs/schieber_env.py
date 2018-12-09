@@ -88,6 +88,7 @@ class SchieberEnv(gym.Env):
         self._take_action(action)
         self.episode_over = not self.observation['cards']  # this is true when the list is empty
         self.reward = self._get_reward(rules_reward=True)
+        logger.info(self.render())  # make rendering available during training too
         return self.observation_dict_to_index(self.observation), self.reward, self.episode_over, {}
 
     def reset(self):
@@ -164,6 +165,7 @@ class SchieberEnv(gym.Env):
             f"Chosen Card: {self.action} --> Card Allowed: {self.valid_card_played}, " \
             f"Played Stich: {stich}"
         print(output)
+        return output
 
     def seed(self, seed=None):
         """Sets the seed for this env's random number generator(s).
@@ -203,8 +205,16 @@ class SchieberEnv(gym.Env):
         self._control_endless_play(stop=True)
 
     def _take_action(self, action):
+        """
+        Performs the necessary steps to take an action in the environment
+            - convert the action intex to a card object
+            - set the action in the external player
+            - receive the observation from the external player
+        :param action:
+        :return:
+        """
         self.action = from_index_to_card(action + 1)  # action is sampled between 0 and 35 but must be between 1 and 36!
-        self.valid_card_played = self._is_card_allowed()
+        self.valid_card_played = self._is_card_allowed()  # call here, because the new observation is not available yet!
         self.player.set_action(self.action)
         self.observation = self.player.get_observation()
 
@@ -240,12 +250,17 @@ class SchieberEnv(gym.Env):
         :return:    1 when the action is allowed
                     -1 otherwise
         """
-        if self._is_card_allowed():
+        if self.valid_card_played:
             return 1
         else:
             return -1
 
     def _is_card_allowed(self):
+        """
+        Checks if the card is allowed. Attention: Take care when to call this method!
+        When the new observation is already available, a call to this method will result in a wrong output!
+        :return:
+        """
         return self.action in self.player.allowed_cards(self.observation)
 
     @staticmethod
