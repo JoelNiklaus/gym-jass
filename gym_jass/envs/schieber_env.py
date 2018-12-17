@@ -27,7 +27,14 @@ class SchieberEnv(gym.Env):
     # index 45 to 47: the cards currently on the table: 45 --> 1st card, 46 --> 2nd card, 47 --> 3rd card
     observation_space = spaces.Box(low=0, high=36, shape=(48,), dtype=int)
 
-    def __init__(self):
+    def __init__(self, rules_reward=True):
+        """
+        Initialize the environment. Starts an endless game.
+        :param rules_reward: whether to give rewards for correctly played cards (True) or for for good play (False)
+        """
+        super(SchieberEnv, self).__init__()
+        self.rules_reward = rules_reward
+
         self.action = None
         self.observation = {}
 
@@ -87,7 +94,7 @@ class SchieberEnv(gym.Env):
 
         self._take_action(action)
         self.episode_over = not self.observation['cards']  # this is true when the list is empty
-        self.reward = self._get_reward(rules_reward=True)
+        self.reward = self._get_reward()
         logger.info(self.render())  # make rendering available during training too
         return self.observation_dict_to_index(self.observation), self.reward, self.episode_over, {}
 
@@ -218,13 +225,12 @@ class SchieberEnv(gym.Env):
         self.player.set_action(self.action)
         self.observation = self.player.get_observation()
 
-    def _get_reward(self, rules_reward=False):
+    def _get_reward(self):
         """
         Calculates the reward of the current timestep
-        :param rules_reward:
         :return:
         """
-        if rules_reward:
+        if self.rules_reward:
             return self._rules_reward()
         else:
             return self._stich_reward()
