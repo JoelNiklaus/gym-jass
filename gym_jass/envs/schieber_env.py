@@ -2,8 +2,11 @@ import logging
 import threading
 
 import gym
+import numpy as np
 from gym import spaces
-from schieber.card import from_card_to_tuple, from_card_to_index, from_index_to_card, from_string_to_index
+from gym.spaces import Discrete
+from schieber.card import from_card_to_tuple, from_card_to_index, from_index_to_card, from_string_to_index, \
+    from_card_to_onehot, from_string_to_onehot, from_onehot_to_card
 from schieber.game import Game
 from schieber.player.greedy_player.greedy_player import GreedyPlayer
 
@@ -14,18 +17,39 @@ from schieber.team import Team
 logger = logging.getLogger(__name__)
 
 
+class CardSpace(gym.spaces.MultiBinary):
+    def __init__(self):
+        self.n = 1
+
+    def sample(self):
+        # trump is intentionally left away for now because the it could sample different trumps in the same game
+        n_values = 9
+        n_suits = 4
+        suit = np.eye(n_suits)[gym.spaces.np_random.choice(n_suits, 1)]
+        value = np.eye(n_values)[gym.spaces.np_random.choice(n_values, 1)]
+        return np.append(suit, value)
+
+
 class SchieberEnv(gym.Env):
     metadata = {'render.modes': ['human']}
-    reward_range = (-257, 257)  # our points minus opponent team's points. reward is always given at the end of one game
+    # our points minus opponent team's points
+    # reward is always given at the end of one game
+    # no match bonus is awarded to make it a constant-sum game
+    reward_range = (-157, 157)
 
     # 0 stands for NO CARD, 1 to 36 are mapped to the 36 possible cards
     # the one card to be chosen
-    action_space = spaces.Discrete(36)
+    # action_space = spaces.Discrete(36)
+    # action_space = CardSpace()
+    action_space = Discrete(9)  # index of the card on the hand
 
     # index 0 to 8: the player's hand
     # index 9 to 44: the cards in the stack which have been turned over in the order of appearance
     # index 45 to 47: the cards currently on the table: 45 --> 1st card, 46 --> 2nd card, 47 --> 3rd card
-    observation_space = spaces.Box(low=0, high=36, shape=(48,), dtype=int)
+    # observation_space = spaces.Box(low=0, high=36, shape=(48,), dtype=int)  # card encoded as scalar between 0 and 36
+
+    # This space does not need to be extended by an own implementation because it is normally not sampled from the observation space.
+    observation_space = spaces.Box(low=0, high=1, shape=(48, 13,), dtype=int)  # card encoded as one hot vector
 
     def __init__(self, rules_reward=True):
         """
@@ -96,7 +120,7 @@ class SchieberEnv(gym.Env):
         self.episode_over = not self.observation['cards']  # this is true when the list is empty
         self.reward = self._get_reward()
         logger.info(self.render())  # make rendering available during training too
-        return self.observation_dict_to_index(self.observation), self.reward, self.episode_over, {}
+        return self.observation_dict_to_onehot_matrix(self.observation), self.reward, self.episode_over, {}
 
     def reset(self):
         """Resets the state of the environment and returns an initial observation.
@@ -108,15 +132,12 @@ class SchieberEnv(gym.Env):
 
         self.observation = {}
 
-        self._control_endless_play()  # if this is not called here, the endless play blocks the execution
+        self._control_endless_play(stop=False)  # if this is not called here, the endless play blocks the execution
 
-        wait = True
-        if self.observation == {}:
-            wait = False
-        observation = self.player.get_observation(wait)
+        observation = self.player.get_observation()
         self.observation = observation
 
-        return self.observation_dict_to_index(observation)
+        return self.observation_dict_to_onehot_matrix(observation)
 
     def _control_endless_play(self, stop=False):
         self.game.endless_play_control.acquire()
@@ -220,7 +241,24 @@ class SchieberEnv(gym.Env):
         :param action:
         :return:
         """
-        self.action = from_index_to_card(action + 1)  # action is sampled between 0 and 35 but must be between 1 and 36!
+        # self.action = from_index_to_card(action + 1)  # action is sampled between 0 and 35 but must be between 1 and 36!
+        # self.action = from_onehot_to_card(action)  # action is a one-hot encoded card
+        hand_cards = self.observation["cards"]
+        if len(hand_cards) < 1:
+            logger.error("The round is over. There are no cards left to play.")
+        elif len(hand_cards) == 1:
+            logger.error("There is only one card left to play. There is no choice anymore.")
+            self.action = hand_cards[0]
+        else:
+            logger.info(f"There are {len(hand_cards)} cards on the hand.")
+            if action < 0:
+                logger.error(f"The chosen action index ({action}) is not allowed to be negative!")
+            elif action >= len(hand_cards):
+                logger.error(f"The chosen action index ({action}) has to be smaller than the number of cards on the hand ({len(hand_cards)})! Choosing the first card on the hand now!")
+                self.action = hand_cards[0]
+            else:
+                logger.info("Successfully chose a card!")
+                self.action = hand_cards[action]
         self.valid_card_played = self._is_card_allowed()  # call here, because the new observation is not available yet!
         self.player.set_action(self.action)
         self.observation = self.player.get_observation()
@@ -283,7 +321,6 @@ class SchieberEnv(gym.Env):
             for i in range(len(observation["cards"])):
                 hand[i] = from_card_to_index(observation["cards"][i])
 
-        # leave stack for simplicity for now
         stack = [0] * (9 * 4)
         for i in range(len(observation["stiche"])):
             stich = observation["stiche"][i]["played_cards"]
@@ -295,3 +332,27 @@ class SchieberEnv(gym.Env):
             table[i] = from_string_to_index(observation["table"][i]["card"])
 
         return hand + stack + table
+
+    @staticmethod
+    def observation_dict_to_onehot_matrix(observation):
+        hand = SchieberEnv.create_empty_list_of_cards(9)
+        if "cards" in observation.keys():  # in the initial observation this may still be empty
+            for i in range(len(observation["cards"])):
+                hand[i] = from_card_to_onehot(observation["cards"][i])
+
+        stack = SchieberEnv.create_empty_list_of_cards(9*4)
+        for i in range(len(observation["stiche"])):
+            stich = observation["stiche"][i]["played_cards"]
+            for j in range(len(stich)):
+                stack[4 * i + j] = from_string_to_onehot(stich[j]['card'])
+
+        table = SchieberEnv.create_empty_list_of_cards(3)
+        for i in range(len(observation["table"])):
+            table[i] = from_string_to_onehot(observation["table"][i]["card"])
+
+        return hand + stack + table
+
+    @staticmethod
+    def create_empty_list_of_cards(n_cards):
+        card = [0] * 4 + [0] * 9  # trumpf bit not included yet because in a first stage we only care about obe_abe
+        return [card for _ in range(n_cards)]
