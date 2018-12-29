@@ -76,6 +76,7 @@ class SchieberEnv(gym.Env):
         self.game = Game(teams, point_limit=1000, use_counting_factor=False, seed=1)
 
         thread = threading.Thread(target=self.game.play_endless)
+        thread.daemon = True  # make thread a daemon so it is killed when the main thread exits
         thread.start()
 
     def __del__(self):
@@ -254,7 +255,8 @@ class SchieberEnv(gym.Env):
             if action < 0:
                 logger.error(f"The chosen action index ({action}) is not allowed to be negative!")
             elif action >= len(hand_cards):
-                logger.error(f"The chosen action index ({action}) has to be smaller than the number of cards on the hand ({len(hand_cards)})! Choosing the first card on the hand now!")
+                logger.error(f"The chosen action index ({action}) has to be smaller than the number of cards "
+                             f"on the hand ({len(hand_cards)})! Choosing the first card on the hand now!")
                 self.action = hand_cards[0]
             else:
                 logger.info("Successfully chose a card!")
@@ -340,7 +342,7 @@ class SchieberEnv(gym.Env):
             for i in range(len(observation["cards"])):
                 hand[i] = from_card_to_onehot(observation["cards"][i])
 
-        stack = SchieberEnv.create_empty_list_of_cards(9*4)
+        stack = SchieberEnv.create_empty_list_of_cards(9 * 4)
         for i in range(len(observation["stiche"])):
             stich = observation["stiche"][i]["played_cards"]
             for j in range(len(stich)):
