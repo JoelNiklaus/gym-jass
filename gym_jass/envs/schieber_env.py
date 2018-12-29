@@ -79,9 +79,6 @@ class SchieberEnv(gym.Env):
         thread.daemon = True  # make thread a daemon so it is killed when the main thread exits
         thread.start()
 
-    def __del__(self):
-        logger.info("Environment has been stopped.")
-
     def step(self, action):
         """Run one timestep of the environment's dynamics. When end of
         episode is reached, you are responsible for calling `reset()`
