@@ -2,11 +2,11 @@ import setuptools
 
 setuptools.setup(
     name='gym_jass',
-    version='0.1.16',
+    version='0.1.17',
     install_requires=['gym>=0.10.8', 'schieber>=0.1.8'],
     author="Joel Niklaus",
     author_email="me@joelniklaus.ch",
-    description="A gym environment for the schieber variant of the Swiss card game Jassen",
+    description="A gym environment for the Schieber variant of the Swiss card game Jass",
     license=open('LICENSE', "r").read(),
     long_description=open('README.md', "r").read(),
     long_description_content_type="text/markdown",

@@ -17,6 +17,9 @@ from schieber.team import Team
 logger = logging.getLogger(__name__)
 
 
+# TODO start thread with eternal game only in first step in order to enable seeding of the environment
+
+
 class CardSpace(gym.spaces.MultiBinary):
     def __init__(self):
         self.n = 1
@@ -49,15 +52,18 @@ class SchieberEnv(gym.Env):
     # observation_space = spaces.Box(low=0, high=36, shape=(48,), dtype=int)  # card encoded as scalar between 0 and 36
 
     # This space does not need to be extended by an own implementation because it is normally not sampled from the observation space.
-    observation_space = spaces.Box(low=0, high=1, shape=(48, 13,), dtype=int)  # card encoded as one hot vector
+    observation_space = spaces.Box(low=0, high=1, shape=(48, 13,), dtype=int)  # card encoded as two hot vector
 
-    def __init__(self, rules_reward=True):
+    def __init__(self, reward_function='play', trumps='all'):
         """
         Initialize the environment. Starts an endless game.
-        :param rules_reward: whether to give rewards for correctly played cards (True) or for for good play (False)
+        :param reward_function: 'play' for good play, 'rules' for playing valid cards
+        :param trumps: 'all' for all available trumps, 'obe_abe' for only obe_abe
         """
         super(SchieberEnv, self).__init__()
-        self.rules_reward = rules_reward
+
+        self.reward_function = reward_function
+        self.trumps = trumps
 
         self.action = None
         self.observation = {}
@@ -66,9 +72,11 @@ class SchieberEnv(gym.Env):
         self.episode_over = False
         self.valid_card_played = None
 
-        self.player = ExternalPlayer(name='GYM-RL')
-        players = [GreedyPlayer(name='Greedy Opponent 1', seed=1), GreedyPlayer(name='Greedy Partner', seed=2),
-                   GreedyPlayer(name='Greedy Opponent 2', seed=3), self.player]
+        players = [ExternalPlayer(name='GYM-RL', trumps=trumps),
+                   GreedyPlayer(name='GreedyOpponent 1', seed=1, trumps=trumps),
+                   GreedyPlayer(name='GreedyPartner', seed=2, trumps=trumps),
+                   GreedyPlayer(name='GreedyOpponent 2', seed=3, trumps=trumps)]
+        self.player = players[0]
         team_1 = Team(players=[players[0], players[2]])
         team_2 = Team(players=[players[1], players[3]])
         teams = [team_1, team_2]
@@ -267,12 +275,15 @@ class SchieberEnv(gym.Env):
         Calculates the reward of the current timestep
         :return:
         """
-        if self.rules_reward:
+        if self.reward_function == 'play':
+            return self._play_reward()
+        elif self.reward_function == 'rules':
             return self._rules_reward()
         else:
-            return self._stich_reward()
+            logger.error("Please specify a valid reward function. Choosing play reward now!")
+            return self._play_reward()
 
-    def _stich_reward(self):
+    def _play_reward(self):
         """
         Gives as reward the point difference of the two teams at the end of the episode.
         We hope that this reward enables learning useful tactics.
@@ -307,32 +318,6 @@ class SchieberEnv(gym.Env):
         return self.action in self.player.allowed_cards(self.observation)
 
     @staticmethod
-    def observation_dict_to_tuple(observation):
-        hand = [(4, 9)] * 9
-        for i in range(len(observation["cards"])):
-            hand[i] = from_card_to_tuple(observation["cards"][i])
-        return tuple(hand)
-
-    @staticmethod
-    def observation_dict_to_index(observation):
-        hand = [0] * 9
-        if "cards" in observation.keys():  # in the initial observation this may still be empty
-            for i in range(len(observation["cards"])):
-                hand[i] = from_card_to_index(observation["cards"][i])
-
-        stack = [0] * (9 * 4)
-        for i in range(len(observation["stiche"])):
-            stich = observation["stiche"][i]["played_cards"]
-            for j in range(len(stich)):
-                stack[4 * i + j] = from_string_to_index(stich[j]['card'])
-
-        table = [0] * 3
-        for i in range(len(observation["table"])):
-            table[i] = from_string_to_index(observation["table"][i]["card"])
-
-        return hand + stack + table
-
-    @staticmethod
     def observation_dict_to_onehot_matrix(observation):
         hand = SchieberEnv.create_empty_list_of_cards(9)
         if "cards" in observation.keys():  # in the initial observation this may still be empty
@@ -355,3 +340,39 @@ class SchieberEnv(gym.Env):
     def create_empty_list_of_cards(n_cards):
         card = [0] * 4 + [0] * 9  # trumpf bit not included yet because in a first stage we only care about obe_abe
         return [card for _ in range(n_cards)]
+
+    @staticmethod
+    def observation_dict_to_tuple(observation):
+        """
+        Not used at the moment due to a change in the observation space.
+        :param observation:
+        :return:
+        """
+        hand = [(4, 9)] * 9
+        for i in range(len(observation["cards"])):
+            hand[i] = from_card_to_tuple(observation["cards"][i])
+        return tuple(hand)
+
+    @staticmethod
+    def observation_dict_to_index(observation):
+        """
+        Not used at the moment due to a change in the observation space.
+        :param observation:
+        :return:
+        """
+        hand = [0] * 9
+        if "cards" in observation.keys():  # in the initial observation this may still be empty
+            for i in range(len(observation["cards"])):
+                hand[i] = from_card_to_index(observation["cards"][i])
+
+        stack = [0] * (9 * 4)
+        for i in range(len(observation["stiche"])):
+            stich = observation["stiche"][i]["played_cards"]
+            for j in range(len(stich)):
+                stack[4 * i + j] = from_string_to_index(stich[j]['card'])
+
+        table = [0] * 3
+        for i in range(len(observation["table"])):
+            table[i] = from_string_to_index(observation["table"][i]["card"])
+
+        return hand + stack + table
