@@ -5,12 +5,11 @@ import gym
 import numpy as np
 from gym import spaces
 from gym.spaces import Discrete
-from schieber.card import from_card_to_tuple, from_card_to_index, from_index_to_card, from_string_to_index, \
-    from_card_to_onehot, from_string_to_onehot, from_onehot_to_card
+from schieber.card import from_card_to_tuple, from_card_to_index, from_string_to_index, from_card_to_onehot, \
+    from_string_to_onehot
 from schieber.game import Game
 from schieber.player.challenge_player.challenge_player import ChallengePlayer
 from schieber.player.greedy_player.greedy_player import GreedyPlayer
-
 from schieber.player.random_player import RandomPlayer
 from schieber.player.external_player import ExternalPlayer
 from schieber.team import Team
@@ -55,13 +54,13 @@ class SchieberEnv(gym.Env):
     # This space does not need to be extended by an own implementation because it is normally not sampled from the observation space.
     observation_space = spaces.Box(low=0, high=1, shape=(48, 13,), dtype=int)  # card encoded as two hot vector
 
-    def __init__(self, reward_function='play', trumps='all', partner_level='challenge', opponents_level='challenge'):
+    def __init__(self, reward_function='play', trumps='all', partner_level='greedy', opponents_level='greedy'):
         """
         Initialize the environment. Starts an endless game.
         :param reward_function: 'play' for good play, 'rules' for playing valid cards
         :param trumps: 'all' for all available trumps, 'obe_abe' for only obe_abe
-        :param partner_level: 'challenge', 'greedy' or 'random'
-        :param opponents_level: 'challenge', 'greedy' or 'random'
+        :param partner_level: 'greedy' or 'random'
+        :param opponents_level: 'greedy' or 'random'
         """
         super(SchieberEnv, self).__init__()
 
@@ -88,22 +87,17 @@ class SchieberEnv(gym.Env):
     def init_teams(self, opponents_level, partner_level, trumps):
         global partner, opponent1, opponent2
 
-        if partner_level == 'challenge':
-            partner = ChallengePlayer(name='ChallengePartner', trumps=trumps)
         if partner_level == 'greedy':
             partner = GreedyPlayer(name='GreedyPlayer', trumps=trumps)
-        if partner_level == 'random':
+        elif partner_level == 'random':
             partner = RandomPlayer(name='RandomPartner', trumps=trumps)
         else:
             logger.error("Please specify a valid partner_level")
 
-        if opponents_level == 'challenge':
-            opponent1 = ChallengePlayer(name='ChallengeOpponent1', trumps=trumps)
-            opponent2 = ChallengePlayer(name='ChallengeOpponent2', trumps=trumps)
         if opponents_level == 'greedy':
             opponent1 = GreedyPlayer(name='GreedyOpponent1', trumps=trumps)
             opponent2 = GreedyPlayer(name='GreedyOpponent2', trumps=trumps)
-        if opponents_level == 'random':
+        elif opponents_level == 'random':
             opponent1 = RandomPlayer(name='RandomOpponent1', trumps=trumps)
             opponent2 = RandomPlayer(name='RandomOpponent2', trumps=trumps)
         else:

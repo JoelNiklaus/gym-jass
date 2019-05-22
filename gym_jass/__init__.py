@@ -8,5 +8,5 @@ register(
 register(
     id='Schieber-v0',
     entry_point='gym_jass.envs:SchieberEnv',
-    kwargs={'rules_reward': True}
+    kwargs={'reward_function': 'play', 'trumps': 'all', 'partner_level': 'greedy', 'opponents_level': 'greedy'},
 )
